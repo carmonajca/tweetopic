@@ -118,7 +118,7 @@ class DMM(sklearn.base.TransformerMixin, sklearn.base.BaseEstimator):
             self.__setattr__(param, value)
         return self
 
-    def fit(self, X: Union[spr.spmatrix, ArrayLike], y: None = None):
+    def fit(self, X: Union[spr.spmatrix, ArrayLike], y: None = None, ini_groups = None):
         """Fits the model using Gibbs Sampling. Detailed description of the
         algorithm in Yin and Wang (2014).
 
@@ -145,15 +145,18 @@ class DMM(sklearn.base.TransformerMixin, sklearn.base.BaseEstimator):
         # using the internal properties of CSR matrices.
         print("Initializing components.")
         self.max_unique_words = np.max(np.diff(X.indptr))
-        doc_unique_words, doc_unique_word_counts = init_doc_words(
-            X.tolil(),
-            max_unique_words=self.max_unique_words,
-        )
-        initial_clusters = np.random.multinomial(
-            1,
-            np.ones(self.n_components) / self.n_components,
-            size=self.n_documents,
-        )
+        if ini_groups is not None:
+            doc_unique_words, doc_unique_word_counts = init_doc_words(
+                X.tolil(),
+                max_unique_words=self.max_unique_words,
+            )
+            initial_clusters = np.random.multinomial(
+                1,
+                np.ones(self.n_components) / self.n_components,
+                size=self.n_documents,
+            )
+        else:
+            initial_clusters = ini_groups
         doc_clusters = np.argmax(initial_clusters, axis=1)
         self.cluster_doc_count = np.zeros(self.n_components)
         self.components_ = np.zeros((self.n_components, self.n_features_in_))
