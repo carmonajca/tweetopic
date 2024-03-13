@@ -145,7 +145,7 @@ class DMM(sklearn.base.TransformerMixin, sklearn.base.BaseEstimator):
         # using the internal properties of CSR matrices.
         print("Initializing components.")
         self.max_unique_words = np.max(np.diff(X.indptr))
-        if ini_groups is not None:
+        if ini_groups is None:
             doc_unique_words, doc_unique_word_counts = init_doc_words(
                 X.tolil(),
                 max_unique_words=self.max_unique_words,
