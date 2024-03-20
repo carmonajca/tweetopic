@@ -1,4 +1,5 @@
 """Module containing sklearn compatible Biterm Topic Model."""
+
 from __future__ import annotations
 
 from typing import Union
@@ -109,7 +110,8 @@ class BTM(sklearn.base.TransformerMixin, sklearn.base.BaseEstimator):
             self.__setattr__(param, value)
         return self
 
-    def fit(self, X: Union[spr.spmatrix, ArrayLike], y: None = None):
+    # pylint: disable=invalid-name, unused-argument
+    def fit(self, X: Union[spr.spmatrix, ArrayLike], y=None, **kwargs):
         """Fits the model using Gibbs Sampling. Detailed description of the
         algorithm in Yan et al. (2013).
 
@@ -140,9 +142,7 @@ class BTM(sklearn.base.TransformerMixin, sklearn.base.BaseEstimator):
             X.tolil(),
             max_unique_words=max_unique_words,
         )
-        biterms = corpus_unique_biterms(
-            doc_unique_words, doc_unique_word_counts
-        )
+        biterms = corpus_unique_biterms(doc_unique_words, doc_unique_word_counts)
         biterm_set = compute_biterm_set(biterms)
         self.topic_distribution, self.components_ = fit_model(
             n_iter=self.n_iterations,

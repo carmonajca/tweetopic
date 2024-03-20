@@ -1,4 +1,5 @@
 """Sampling utilities using jax and blackjax."""
+
 from functools import partial
 from typing import Any, Callable
 
@@ -52,9 +53,7 @@ def sample_nuts(
     warmup_key, sampling_key = jax.random.split(rng_key)
     print("Warmup, window adaptation")
     warmup = blackjax.window_adaptation(blackjax.nuts, logdensity_fn)
-    (state, parameters), _ = warmup.run(
-        warmup_key, initial_position, num_steps=n_warmup
-    )
+    (state, parameters), _ = warmup.run(warmup_key, initial_position, num_steps=n_warmup)
     kernel = jax.jit(blackjax.nuts(logdensity_fn, **parameters).step)
     states = []
     for i in trange(n_samples, desc="Sampling"):
@@ -133,9 +132,7 @@ def sample_pathfinder(
     optim_key, sampling_key = jax.random.split(rng_key)
     pathfinder = blackjax.pathfinder(logdensity_fn)
     print("Optimizing normal approximations.")
-    state, _ = jax.jit(pathfinder.approximate)(
-        rng_key=optim_key, position=initial_position, ftol=1e-4
-    )
+    state, _ = jax.jit(pathfinder.approximate)(rng_key=optim_key, position=initial_position, ftol=1e-4)
     print("Sampling approximate normals.")
     samples = pathfinder.sample(sampling_key, state, n_samples)
     return samples
@@ -156,9 +153,7 @@ def sample_meanfield_vi(
     rng_key = jax.random.PRNGKey(seed)
     optim_key, sampling_key = jax.random.split(rng_key)
     optimizer = adam(learning_rate)
-    mfvi = blackjax.meanfield_vi(
-        logdensity_fn, optimizer=optimizer, num_samples=n_optim_samples
-    )
+    mfvi = blackjax.meanfield_vi(logdensity_fn, optimizer=optimizer, num_samples=n_optim_samples)
     states = []
     state = mfvi.init(initial_position)
     kernel = jax.jit(mfvi.step)
@@ -173,17 +168,12 @@ def sample_meanfield_vi(
 def batch_data(rng_key, batch_size: int, data_size: int):
     while True:
         _, rng_key = jax.random.split(rng_key)
-        idx = jax.random.choice(
-            key=rng_key, a=jnp.arange(data_size), shape=(batch_size,)
-        )
+        idx = jax.random.choice(key=rng_key, a=jnp.arange(data_size), shape=(batch_size,))
         yield idx
 
 
 def get_batch(idx, data: dict, data_axis: int):
-    return {
-        key: jnp.take(value, idx, axis=data_axis)
-        for key, value in data.items()
-    }
+    return {key: jnp.take(value, idx, axis=data_axis) for key, value in data.items()}
 
 
 # TODO
@@ -200,17 +190,11 @@ def sample_minibatch_hmc(
 ) -> tuple[list[PyTree], list[HMCState]]:
     rng_key = jax.random.PRNGKey(seed)
     batch_key, warmup_key, sampling_key = jax.random.split(rng_key, 3)
-    batches = batch_data(
-        batch_key, batch_size, data_size=len(data[list(data.keys())[0]])
-    )
+    batches = batch_data(batch_key, batch_size, data_size=len(data[list(data.keys())[0]]))
     print("Warmup, window adaptation")
     warmup_batch = get_batch(next(batches), data, data_axis=data_axis)
-    warmup = blackjax.window_adaptation(
-        blackjax.hmc, partial(logdensity_fn, **warmup_batch)
-    )
-    (state, parameters), _ = warmup.run(
-        warmup_key, initial_position, num_steps=n_warmup
-    )
+    warmup = blackjax.window_adaptation(blackjax.hmc, partial(logdensity_fn, **warmup_batch))
+    (state, parameters), _ = warmup.run(warmup_key, initial_position, num_steps=n_warmup)
     sghmc = blackjax.sghmc()
     kernel = jax.jit(blackjax.nuts(logdensity_fn, **parameters).step)
     states = []

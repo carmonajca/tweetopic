@@ -4,16 +4,17 @@ import random
 from typing import Dict, Tuple, TypeVar
 
 import numpy as np
-from numba import njit
+from numba import njit, config
 from tqdm import tqdm
 
 from tweetopic._prob import norm_prob, sample_categorical
 
 
+config.THREADING_LAYER = "threadsafe"
+
+
 @njit
-def doc_unique_biterms(
-    doc_unique_words: np.ndarray, doc_unique_word_counts: np.ndarray
-) -> Dict[Tuple[int, int], int]:
+def doc_unique_biterms(doc_unique_words: np.ndarray, doc_unique_word_counts: np.ndarray) -> Dict[Tuple[int, int], int]:
     (n_max_unique_words,) = doc_unique_words.shape
     biterm_counts = dict()
     for i_term in range(n_max_unique_words):
@@ -56,23 +57,17 @@ def corpus_unique_biterms(
     doc_unique_words: np.ndarray, doc_unique_word_counts: np.ndarray
 ) -> Dict[Tuple[int, int], int]:
     n_documents, _ = doc_unique_words.shape
-    biterm_counts = doc_unique_biterms(
-        doc_unique_words[0], doc_unique_word_counts[0]
-    )
+    biterm_counts = doc_unique_biterms(doc_unique_words[0], doc_unique_word_counts[0])
     for i_doc in range(1, n_documents):
         doc_unique_words_i = doc_unique_words[i_doc]
         doc_unique_word_counts_i = doc_unique_word_counts[i_doc]
-        doc_biterms = doc_unique_biterms(
-            doc_unique_words_i, doc_unique_word_counts_i
-        )
+        doc_biterms = doc_unique_biterms(doc_unique_words_i, doc_unique_word_counts_i)
         nb_add_counter(biterm_counts, doc_biterms)
     return biterm_counts
 
 
 @njit
-def compute_biterm_set(
-    biterm_counts: Dict[Tuple[int, int], int]
-) -> np.ndarray:
+def compute_biterm_set(biterm_counts: Dict[Tuple[int, int], int]) -> np.ndarray:
     return np.array(list(biterm_counts.keys()))
 
 
@@ -115,9 +110,7 @@ def add_biterm(
     topic_word_count: np.ndarray,
     topic_biterm_count: np.ndarray,
 ) -> None:
-    add_remove_biterm(
-        True, i_biterm, i_topic, biterms, topic_word_count, topic_biterm_count
-    )
+    add_remove_biterm(True, i_biterm, i_topic, biterms, topic_word_count, topic_biterm_count)
 
 
 @njit(fastmath=True)
@@ -128,9 +121,7 @@ def remove_biterm(
     topic_word_count: np.ndarray,
     topic_biterm_count: np.ndarray,
 ) -> None:
-    add_remove_biterm(
-        False, i_biterm, i_topic, biterms, topic_word_count, topic_biterm_count
-    )
+    add_remove_biterm(False, i_biterm, i_topic, biterms, topic_word_count, topic_biterm_count)
 
 
 @njit(fastmath=True)
@@ -146,9 +137,7 @@ def init_components(
     for i_biterm in range(n_biterms):
         i_topic = random.randint(0, n_components - 1)
         biterm_topic_assignments[i_biterm] = i_topic
-        add_biterm(
-            i_biterm, i_topic, biterms, topic_word_count, topic_biterm_count
-        )
+        add_biterm(i_biterm, i_topic, biterms, topic_word_count, topic_biterm_count)
     return biterm_topic_assignments, topic_word_count, topic_biterm_count
 
 
@@ -215,16 +204,14 @@ def estimate_parameters(
     topic_distribution = np.empty(n_components)
     # Equation 6
     for i_topic in range(n_components):
-        topic_distribution[i_topic] = (topic_biterm_count[i_topic] + alpha) / (
-            n_biterms + n_components * alpha
-        )
+        topic_distribution[i_topic] = (topic_biterm_count[i_topic] + alpha) / (n_biterms + n_components * alpha)
     # Equation 5
     for i_topic in range(n_components):
         n_topic_terms = topic_biterm_count[i_topic] * 2
         for i_term in range(n_vocab):
-            topic_word_distribution[i_topic, i_term] = (
-                topic_word_count[i_topic, i_term] + beta
-            ) / (n_topic_terms + n_vocab * beta)
+            topic_word_distribution[i_topic, i_term] = (topic_word_count[i_topic, i_term] + beta) / (
+                n_topic_terms + n_vocab * beta
+            )
     return topic_distribution, topic_word_distribution
 
 
@@ -391,9 +378,7 @@ def prob_topic_given_biterm(
     n_topics = topic_distribution.shape[0]
     for i_topic in range(n_topics):
         prediction[i_topic] = (
-            topic_distribution[i_topic]
-            * topic_word_distribution[i_topic, w_i]
-            * topic_word_distribution[i_topic, w_j]
+            topic_distribution[i_topic] * topic_word_distribution[i_topic, w_i] * topic_word_distribution[i_topic, w_j]
         )
     norm_prob(prediction)
 
@@ -423,9 +408,7 @@ def prob_topic_given_document(
                 topic_word_distribution,
             )
             p_biterm_given_document = biterm_count / total_biterms
-            prediction[i_topic] += (
-                p_topic_given_biterm[i_topic] * p_biterm_given_document
-            )
+            prediction[i_topic] += p_topic_given_biterm[i_topic] * p_biterm_given_document
     norm_prob(prediction)
 
 
@@ -447,9 +430,7 @@ def predict_docs(
             doc_unique_word_counts[i_doc],
         )
         biterms = doc_unique_biterms(words, word_counts)
-        prob_topic_given_document(
-            pred, biterms, topic_distribution, topic_word_distribution
-        )
+        prob_topic_given_document(pred, biterms, topic_distribution, topic_word_distribution)
         predictions[i_doc, :] = pred
     return predictions
 

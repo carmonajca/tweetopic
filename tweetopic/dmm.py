@@ -118,7 +118,8 @@ class DMM(sklearn.base.TransformerMixin, sklearn.base.BaseEstimator):
             self.__setattr__(param, value)
         return self
 
-    def fit(self, X: Union[spr.spmatrix, ArrayLike], y: None = None, ini_groups = None):
+    # pylint: disable=invalid-name, unused-argument
+    def fit(self, X: Union[spr.spmatrix, ArrayLike], y=None, ini_groups=None):
         """Fits the model using Gibbs Sampling. Detailed description of the
         algorithm in Yin and Wang (2014).
 

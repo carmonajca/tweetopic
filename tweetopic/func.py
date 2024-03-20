@@ -1,4 +1,5 @@
 """Utility functions for use in the library."""
+
 from functools import wraps
 from typing import Callable
 

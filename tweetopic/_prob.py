@@ -1,5 +1,7 @@
 import numpy as np
-from numba import njit
+from numba import njit, config
+
+config.THREADING_LAYER = "threadsafe"
 
 
 @njit(fastmath=True)

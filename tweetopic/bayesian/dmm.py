@@ -1,5 +1,6 @@
 """JAX implementation of probability densities and parameter initialization
 for the Dirichlet Multinomial Mixture Model."""
+
 from functools import partial
 
 import jax
@@ -7,13 +8,11 @@ import jax.numpy as jnp
 import numpy as np
 import scipy.sparse as spr
 import scipy.stats
-import sklearn
+from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.exceptions import NotFittedError
-from tqdm import tqdm, trange
 
 from tweetopic._doc import init_doc_words
 from tweetopic.bayesian.sampling import Sampler, sample_sgld
-from tweetopic.func import spread
 
 
 def symmetric_dirichlet_multinomial_mean(alpha: float, n: int, K: int):
@@ -21,14 +20,10 @@ def symmetric_dirichlet_multinomial_mean(alpha: float, n: int, K: int):
     return np.full(K, n * alpha / K * alpha)
 
 
-def init_parameters(
-    n_docs: int, n_vocab: int, n_components: int, alpha: float, beta: float
-) -> dict:
+def init_parameters(n_docs: int, n_vocab: int, n_components: int, alpha: float, beta: float) -> dict:
     """Initializes the parameters of the dmm to the mean of the prior."""
     return dict(
-        weights=symmetric_dirichlet_multinomial_mean(
-            alpha, n_docs, n_components
-        ),
+        weights=symmetric_dirichlet_multinomial_mean(alpha, n_docs, n_components),
         components=np.broadcast_to(
             scipy.stats.dirichlet.mean(np.full(n_vocab, beta)),
             (n_components, n_vocab),
@@ -46,9 +41,7 @@ def sparse_multinomial_logpdf(
     n_words = jnp.sum(unique_word_counts)
     n_factorial = jax.lax.lgamma(n_words + 1)
     word_count_factorial = jax.lax.lgamma(unique_word_counts + 1)
-    word_count_factorial = jnp.where(
-        unique_word_counts != 0, word_count_factorial, 0
-    )
+    word_count_factorial = jnp.where(unique_word_counts != 0, word_count_factorial, 0)
     denominator = jnp.sum(word_count_factorial)
     probs = component[unique_words]
     numerator_terms = probs * unique_word_counts
@@ -91,12 +84,8 @@ def predict_doc(components, weights, unique_words, unique_word_counts):
         unique_words=unique_words,
         unique_word_counts=unique_word_counts,
     )
-    component_logprobs = jax.lax.map(component_logpdf, components) + jnp.log(
-        weights
-    )
-    norm_probs = jnp.exp(
-        component_logprobs - jax.scipy.special.logsumexp(component_logprobs)
-    )
+    component_logprobs = jax.lax.map(component_logpdf, components) + jnp.log(weights)
+    norm_probs = jnp.exp(component_logprobs - jax.scipy.special.logsumexp(component_logprobs))
     return norm_probs
 
 
@@ -110,21 +99,15 @@ def predict_one(unique_words, unique_word_counts, components, weights):
     )(components, weights)
 
 
-def posterior_predictive(
-    doc_unique_words, doc_unique_word_counts, components, weights
-):
+def posterior_predictive(doc_unique_words, doc_unique_word_counts, components, weights):
     """Predicts probability of a document belonging to each component
     for all posterior samples.
     """
-    predict_all = jax.vmap(
-        partial(predict_one, components=components, weights=weights)
-    )
+    predict_all = jax.vmap(partial(predict_one, components=components, weights=weights))
     return predict_all(doc_unique_words, doc_unique_word_counts)
 
 
-def dmm_loglikelihood(
-    components, weights, doc_unique_words, doc_unique_word_counts, alpha, beta
-):
+def dmm_loglikelihood(components, weights, doc_unique_words, doc_unique_word_counts, alpha, beta):
     docs = jnp.stack((doc_unique_words, doc_unique_word_counts), axis=1)
 
     def doc_likelihood(doc):
@@ -134,9 +117,7 @@ def dmm_loglikelihood(
             unique_words=unique_words,
             unique_word_counts=unique_word_counts,
         )
-        component_logprobs = jax.lax.map(
-            component_logpdf, components
-        ) + jnp.log(weights)
+        component_logprobs = jax.lax.map(component_logpdf, components) + jnp.log(weights)
         return jax.scipy.special.logsumexp(component_logprobs)
 
     loglikelihood = jnp.sum(jax.lax.map(doc_likelihood, docs))
@@ -144,20 +125,12 @@ def dmm_loglikelihood(
 
 
 def dmm_logprior(components, weights, alpha, beta, n_docs):
-    components_prior = jnp.sum(
-        jax.lax.map(
-            partial(symmetric_dirichlet_logpdf, alpha=alpha), components
-        )
-    )
-    weights_prior = symmetric_dirichlet_multinomial_logpdf(
-        weights, n=jnp.float64(n_docs), alpha=beta
-    )
+    components_prior = jnp.sum(jax.lax.map(partial(symmetric_dirichlet_logpdf, alpha=alpha), components))
+    weights_prior = symmetric_dirichlet_multinomial_logpdf(weights, n=jnp.float64(n_docs), alpha=beta)
     return components_prior + weights_prior
 
 
-def dmm_logpdf(
-    components, weights, doc_unique_words, doc_unique_word_counts, alpha, beta
-):
+def dmm_logpdf(components, weights, doc_unique_words, doc_unique_word_counts, alpha, beta):
     """Calculates logdensity of the DMM at a given point in parameter space."""
     n_docs = doc_unique_words.shape[0]
     loglikelihood = dmm_loglikelihood(
@@ -172,7 +145,7 @@ def dmm_logpdf(
     return logprior + loglikelihood
 
 
-class BayesianDMM(sklearn.base.TransformerMixin, sklearn.base.BaseEstimator):
+class BayesianDMM(TransformerMixin, BaseEstimator):
     """Fully Bayesian Dirichlet Multinomial Mixture Model."""
 
     def __init__(
@@ -226,7 +199,8 @@ class BayesianDMM(sklearn.base.TransformerMixin, sklearn.base.BaseEstimator):
             self.__setattr__(param, value)
         return self
 
-    def fit(self, X, y=None):
+    # pylint: disable=invalid-name, unused-argument
+    def fit(self, X, y=None, **kwargs):
         # Converting X into sparse array if it isn't one already.
         X = spr.csr_matrix(X)
         # Filtering out empty documents

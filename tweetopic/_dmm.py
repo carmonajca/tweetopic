@@ -1,13 +1,16 @@
 """Module containing tools for fitting a Dirichlet Multinomial Mixture Model."""
+
 from __future__ import annotations
 
 from math import exp, log
 
 import numpy as np
-from numba import njit
+from numba import njit, config
 from tqdm import tqdm
 
 from tweetopic._prob import norm_prob, sample_categorical
+
+config.THREADING_LAYER = "threadsafe"
 
 
 @njit
@@ -198,8 +201,7 @@ def _cond_prob(
     # I use logs instead of computing the products directly,
     # as it would quickly result in numerical overflow.
     log_norm_term = log(
-        (cluster_doc_count[i_cluster] + alpha)
-        / (n_docs - 1 + n_clusters * alpha),
+        (cluster_doc_count[i_cluster] + alpha) / (n_docs - 1 + n_clusters * alpha),
     )
     log_numerator = 0
     for i_unique in range(max_unique_words):
@@ -381,7 +383,7 @@ def fit_model(
 ) -> None:
     doc_word_count = np.sum(doc_unique_word_counts, axis=1)
     prediction = np.empty(n_clusters)
-    iterator = tqdm(range(n_iter), desc="Sampling")
+    iterator = range(n_iter)  # tqdm(range(n_iter), desc="Sampling")
     for _ in iterator:
         _sampling_step(
             alpha=alpha,
