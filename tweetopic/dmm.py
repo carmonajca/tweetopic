@@ -144,7 +144,7 @@ class DMM(sklearn.base.TransformerMixin, sklearn.base.BaseEstimator):
         self.n_documents, self.n_features_in_ = X.shape
         # Calculating the number of nonzero elements for each row
         # using the internal properties of CSR matrices.
-        print("Initializing components.")
+        # print("Initializing components.")
         self.max_unique_words = np.max(np.diff(X.indptr))
         if ini_groups is None:
             doc_unique_words, doc_unique_word_counts = init_doc_words(
